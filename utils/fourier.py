@@ -19,7 +19,6 @@ def butterworth_filter(order, cutoff, fs, btype='lowpass', plot=True):
     
         nyquist = fs/2
         normalized_cutoff = cutoff / nyquist
-        #print(normalized_cutoff)
         b,a = signal.butter(N=order, Wn=normalized_cutoff, btype=btype, analog=False)
         
         if plot:
@@ -50,9 +49,12 @@ def butterworth_filter(order, cutoff, fs, btype='lowpass', plot=True):
         return b,a
     
 
-def apply_butterfilter_df(df,order, cutoff, fs, btype='lowpass'):
+def apply_butterfilter_df(df,order, cutoff, fs, btype='lowpass',subset=False):
     
-    b, a = butterworth_filter(order, cutoff,fs, btype=btype, plot=False)
+    if subset:
+        df = df[subset].T.to_numpy()
+    
+    b, a = butterworth_filter(order, cutoff, fs, btype=btype, plot=False)
     
     df_butter_filtered = []
 
@@ -64,19 +66,19 @@ def apply_butterfilter_df(df,order, cutoff, fs, btype='lowpass'):
     return df_butter_filtered
 
 
-def compare_filtered_signals(df, df_filtered, columns, legend, nrows, ncols, figsize):
+def compare_filtered_signals(df, df_filtered, subset, legend, nrows, ncols, figsize):
 
     fig, ax = plt.subplots(nrows=nrows, ncols=ncols,figsize=figsize, tight_layout=True)
     ax = ax.reshape((nrows*ncols,))
 
-    for idx2 in range(len(columns)):
+    for idx2 in range(len(subset)):
         
         ax[idx2].plot(df[idx2])
         ax[idx2].plot(df_filtered[idx2], alpha=0.9)
 
         ax[idx2].legend([legend + ' denoised',legend + ' denoised + butterworth'])
         ax[idx2].set_xlabel('Index')
-        ax[idx2].set_ylabel(str(columns[idx2]))
+        ax[idx2].set_ylabel(str(subset[idx2]))
         
     return fig, ax
 

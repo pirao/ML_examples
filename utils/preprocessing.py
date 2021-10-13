@@ -7,7 +7,7 @@ from scipy.fft import fft, fftfreq, ifft, fft2,ifft2
 from scipy.signal import welch, butter, filtfilt
 
 
-def get_file_names(folder_path,returns=False):
+def get_file_names(folder_path,returns=True):
     """This function obtain a list of all files inside a specific folder
 
     Args:
@@ -84,7 +84,19 @@ def split_columns(df, column, new_col_names, rename_cols = True, drop_col=True, 
     
     return pd.concat([df,df_expanded],axis=1)
     
-    
-    
-    
-    
+
+###################################
+# Date time columns
+#######################################
+
+def cut_date_decimal_places(df, column, position=-5):
+
+    df_aux = df.copy()
+    date_strings = df_aux[column].to_numpy()
+
+    for idx in range(len(df_aux)):
+        date_strings[idx] = date_strings[idx][0:position]
+
+        df_cut = pd.DataFrame(date_strings)
+
+    return df_cut

@@ -8,7 +8,13 @@ import math
 from tqdm import tqdm
 import os
 
+import plotly.express as px
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
 
+###############################
+# Matplotlib
+###############################
 
 def lineplot_sensors(df, x, y, n_cols=3, figsize=(30, 40), hue=None, hue_order=None):
 
@@ -56,3 +62,12 @@ def kdeplot_sensors(df,  x, y, n_cols=2, figsize=(30, 40), hue=None, hue_order=N
         iax += 1
 
     return fig, ax
+
+
+####################################
+#  Plotly
+####################################
+
+
+
+
