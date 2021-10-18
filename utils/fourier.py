@@ -16,41 +16,64 @@ from scipy.signal import welch, butter, filtfilt
 ########################################
 
 def butterworth_filter(order, cutoff, fs, btype='lowpass', plot=True):
-    
-        nyquist = fs/2
-        normalized_cutoff = cutoff / nyquist
-        b,a = signal.butter(N=order, Wn=normalized_cutoff, btype=btype, analog=False)
-        
-        if plot:
-            
-            w, h = signal.freqz(b,a, worN=1024)
-            w = w*(fs/(2*np.pi))  # rad/amostra * (1/rad) = 1/amostra = Hz
-            fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(20, 8), tight_layout=True)
+    """Creating the butterworth filter
 
-            plt.plot(w, abs(h))  
-            plt.axhline(1/np.sqrt(2), color='red', linestyle='--')
-            plt.title('Butterworth filter frequency response')
-            plt.xlabel('Frequency [Hz]')
-            plt.ylabel('Amplitude')
+    Args:
+        order (int): The order of the filter.
+        cutoff (float): Cutoff frequency in Hertz (Hz)
+        fs (float): Sampling rate (samples/s or samples/m)
+        btype (str, optional): Type of filter. Defaults to 'lowpass'.
+        plot (bool, optional): Visualize the Butterworth filter. Defaults to True.
+
+    Returns:
+        b,a: Numerator (b) and denominator (a) polynomials of the IIR (infinite impulse response) filter. 
+    """
+    nyquist = fs/2
+    normalized_cutoff = cutoff / nyquist
+    b,a = signal.butter(N=order, Wn=normalized_cutoff, btype=btype, analog=False)
+        
+    if plot:
             
-            if btype == 'bandpass':
-                plt.axvline(cutoff[0], color='green',linestyle='--')  
-                plt.axvline(cutoff[1], color='green',linestyle='--') 
-                plt.legend(['Butterworth filter - order {}'.format(order),
+        w, h = signal.freqz(b,a, worN=1024)
+        w = w*(fs/(2*np.pi))  # rad/amostra * (1/rad) = 1/amostra = Hz
+        fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(20, 8), tight_layout=True)
+
+        plt.plot(w, abs(h))  
+        plt.axhline(1/np.sqrt(2), color='red', linestyle='--')
+        plt.title('Butterworth filter frequency response')
+        plt.xlabel('Frequency [Hz]')
+        plt.ylabel('Amplitude')
+            
+        if btype == 'bandpass':
+            plt.axvline(cutoff[0], color='green',linestyle='--')  
+            plt.axvline(cutoff[1], color='green',linestyle='--') 
+            plt.legend(['Butterworth filter - order {}'.format(order),
                             'Cutoff ampltitude - {}'.format(1/np.sqrt(2)), 'Lower cutoff frequency - {} Hz'.format(cutoff[0]),
                             'Upper cutoff frequency - {} Hz'.format(cutoff[1])])
-            elif btype == 'lowpass':
-                plt.axvline(cutoff, color='green', linestyle='--')
-                plt.legend(['Butterworth filter - order {}'.format(order),'Cutoff ampltitude', 'Cutoff frequency - {} Hz'.format(cutoff)])
+        elif btype == 'lowpass':
+            plt.axvline(cutoff, color='green', linestyle='--')
+            plt.legend(['Butterworth filter - order {}'.format(order),'Cutoff ampltitude', 'Cutoff frequency - {} Hz'.format(cutoff)])
                 
                 
-            plt.show()
+        plt.show()
             
-        return b,a
+    return b,a
     
 
 def apply_butterfilter_df(df,order, cutoff, fs, btype='lowpass',subset=False):
-    
+    """Apply the butterworth filter on a dataset
+
+    Args:
+        df (pandas): Pandas dataset
+        order (int): The order of the filter.
+        cutoff (float): Cutoff frequency in Hertz (Hz)
+        fs (float): Sampling rate (samples/s or samples/m)
+        btype (str, optional): Type of filter. Defaults to 'lowpass'.
+        subset (bool, optional): Specify a subset of the dataframe you wish to filter. Defaults to False.
+
+    Returns:
+        pandas: Filtered dataset
+    """
     if subset:
         df = df[subset].T.to_numpy()
     
@@ -67,7 +90,20 @@ def apply_butterfilter_df(df,order, cutoff, fs, btype='lowpass',subset=False):
 
 
 def compare_filtered_signals(df, df_filtered, subset, legend, nrows, ncols, figsize):
+    """Compare the original dataframe with the filtered one
 
+    Args:
+        df (pandas): Unfiltered dataframe of the dataset
+        df_filtered (pandas): Filtered dataframe
+        subset (list): List of columns in which to do the comparison
+        legend (str): Legend label
+        nrows (int): Number of rows
+        ncols (int): Number of columns
+        figsize (tuple): Figure size
+
+    Returns:
+        fig,ax:
+    """
     fig, ax = plt.subplots(nrows=nrows, ncols=ncols,figsize=figsize, tight_layout=True)
     ax = ax.reshape((nrows*ncols,))
 
@@ -101,7 +137,12 @@ def unscaled_FFT(signal, dt):
         dt (float): sampling interval [seconds/sample] or [meters/sample]
 
     Returns:
-        [type]: [description]
+        freq: frequency vector
+        mag: magnitude of the FFT 
+        fhat: FFT amplitude
+        L: Index vector to represent the 1st half of the spectrum
+        dc: DC component of the signal
+        power: Power of the signal
     """
     N = len(signal)
     dc = np.mean(signal)                        # DC component
@@ -121,6 +162,19 @@ def unscaled_FFT(signal, dt):
 
 
 def noise_filter(signal, dt, threshold):
+    """Filter a signal based on a noise threshold
+
+    Args:
+        signal (numpy array): Time series signal
+        dt (float): Sampling interval (s/sample or m/sample)
+        threshold (float): Threshold used to define the noise level. Values above this level are maintained while those below are pruned.
+
+    Returns:
+        clean_fhat: Denoised signal
+        clean_power: Denoised power signal
+        keep_idx: Index used to show which signal will be kept
+        dc: DC component of the signal
+    """
 
     freq, mag, fhat, L, dc, power = unscaled_FFT(signal.to_numpy(), dt)
 
@@ -133,6 +187,18 @@ def noise_filter(signal, dt, threshold):
 
 
 def noise_filter_df(df, dt, subset, threshold_list):
+    """Filter an entire dataframe based on a list of thresholds
+
+    Args:
+        df (pandas): Pandas dataframe of the dataset
+        dt (float): Sampling interval
+        subset (list): List of columns that will be denoised
+        threshold_list (list): List of thresholds to be applied for each individual signal
+
+    Returns:
+        df_denoised (pandas): Denoised dataframe
+        keep_idx (numpy array): Index used to show which signal will be kept
+    """
 
     df = df[subset]
     df_denoised = []
@@ -144,8 +210,24 @@ def noise_filter_df(df, dt, subset, threshold_list):
     return df_denoised, keep_idx
 
    
-def plot_FFT(df, dt, nrows, subset, ncols, legend, figsize=(20, 8), plot_filtered=False, threshold_list=[5, 10, 15]):
+def plot_FFT(df, dt, nrows, ncols,  subset, legend, figsize=(20, 8), plot_filtered=False, threshold_list=[5, 10, 15]):
+    """Plot the FFT of a dataframe and compare to its denoised version
 
+    Args:
+        df (pandas): Pandas dataframe of the dataset
+        dt (float): Sampling interval
+        nrows (int): Number of rows
+        ncols (int): Number of columns
+        subset (list): List of columns to apply the denoising threshold
+        legend (list): Legend label
+        figsize (tuple, optional): Figure size. Defaults to (20, 8).
+        plot_filtered (bool, optional): Plot the filtered and unfiltered variables. Defaults to False.
+        threshold_list (list, optional): List of thresholds to apply the filter. Defaults to [5, 10, 15].
+
+    Returns:
+        fig, ax: 
+        df_FFT (numpy array): Denoised dataset in the frequency domain 
+    """
     
     df = df[subset]
     df_FFT = []
@@ -179,6 +261,18 @@ def plot_FFT(df, dt, nrows, subset, ncols, legend, figsize=(20, 8), plot_filtere
 
 
 def ifft_df(df, df_FFT, dt, subset, threshold_list):
+    """Apply the inverse Fourier transform
+
+    Args:
+        df (pandas): Pandas dataframe of the dataset
+        df_FFT (numpy array): Dataset in the frequency domain
+        dt (float): sampling interval
+        subset (list): Dataframe columns
+        threshold_list (list): List of threshold value to apply the filter
+
+    Returns:
+        [type]: [description]
+    """
     
     df_filtered = []
 
@@ -213,7 +307,17 @@ def compare_filtered_unfiltered(df, df_filtered, legend, subset, nrows, ncols, f
 #############################
 
 def Welch_PSD(signal, fs, window_size_frac=0.3, overlap_frac=0.8):
+    """Welch's method for obtaining the Fourier spectrum
 
+    Args:
+        signal (pandas): time series signal
+        fs (float): sampling rate in Hertz (Hz)
+        window_size_frac (float, optional): Fraction of the dataset to use as a window for applying Welch's method. Defaults to 0.3.
+        overlap_frac (float, optional): Permissible overlap between sucessive windows. Defaults to 0.8.
+
+    Returns:
+        [type]: [description]
+    """
     #fs = sampling frequency - samples/meter
 
     segment_size = np.int32(window_size_frac*len(signal))

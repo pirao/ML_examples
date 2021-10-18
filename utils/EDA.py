@@ -25,7 +25,13 @@ from eli5.sklearn import PermutationImportance
 ################################
 
 def corr_plot(df,target_col,th=0.4):
+    """Visualization of all 3 univariate correlations (Pearson, Spearman,PPS)
 
+    Args:
+        df (pandas): Pandas dataframe containing the dataset
+        target_col (str): Target column of the dataset
+        th (float, optional): Display a threshold to better highlight good and bad correlations. Defaults to 0.4.
+    """
     c_vec = []
     methods = ['pearson', 'spearman', 'pps']
 
@@ -70,7 +76,13 @@ def corr_plot(df,target_col,th=0.4):
 
 
 def dual_heat_map(data, figsize=(25, 15), dual=True):
+    """Plot the Pearson and Spearman heatmap side by side
 
+    Args:
+        data (pandas): Pandas dataframe containing the data
+        figsize (tuple, optional): Figure size. Defaults to (25, 15).
+        dual (bool, optional): Specify whether the visualize just the Pearson heatmap or both Pearson and Spearman side by side. Defaults to True.
+    """
     sns.set(font_scale=1.1)
     corr_pearson = data.corr(method='pearson')
     corr_spearman = data.corr(method='spearman')
@@ -97,6 +109,12 @@ def dual_heat_map(data, figsize=(25, 15), dual=True):
 
 
 def pps_heat_map(data, figsize=(30, 15)):
+    """Power predictive score heatmap
+
+    Args:
+        data (pandas): Pandas dataframe
+        figsize (tuple, optional): Figure size. Defaults to (30, 15).
+    """
     corr = pps.matrix(data)[['x', 'y', 'ppscore']].pivot(columns='x', index='y', values='ppscore')
     plt.figure(figsize=figsize)
     sns.heatmap(corr, cmap="coolwarm", linewidths=0.5, annot=True)
@@ -110,9 +128,22 @@ def pps_heat_map(data, figsize=(30, 15)):
 
 
 def scatterplot_pearson(df, x_vars, y_vars, cmap='viridis', hue='Class', height=3, aspect=1):
+    """Pairplot of all variables of a dataframe
+
+    Args:
+        df (pandas): Pandas dataframe
+        x_vars (list of variable names): Variables to plot on the x axis
+        y_vars (list of variable names): Variables to plot on the y axis
+        cmap (str, optional): Colormap of the plot. Defaults to 'viridis'.
+        hue (str, optional): Variable in df to map plot aspects to different colors. Defaults to 'Class'.
+        height (int, optional): Height (in inches) of each facet.. Defaults to 3.
+        aspect (int, optional): Aspect * height gives the width (in inches) of each facet.. Defaults to 1.
+
+    Returns:
+        Pairgrid: Returns the underlying PairGrid instance for further tweaking.
+    """
     sns.set(font_scale=1.9)
-    g = sns.PairGrid(df, hue=hue, x_vars=x_vars, y_vars=y_vars,
-                     palette=cmap, corner=False, height=height, aspect=aspect)
+    g = sns.PairGrid(df, hue=hue, x_vars=x_vars, y_vars=y_vars,palette=cmap, corner=False, height=height, aspect=aspect)
     g.map_diag(sns.histplot, color='.5')
     g.map_offdiag(sns.scatterplot, s=3, alpha=0.6)
     g.add_legend(fontsize=16, bbox_to_anchor=(1.5, 1))
@@ -122,26 +153,35 @@ def scatterplot_pearson(df, x_vars, y_vars, cmap='viridis', hue='Class', height=
 
 
 ##############################################
-# Multivariate importance
+# Multivariate correlation
 ###############################################
 
 
 class multivariate_importance():
     def __init__(self, X_train, X_test, y_train, y_test, nmodels=6):
+        """Object used for multivariate correlation based around wrapper methods of specific ML models. 
 
+        Args:
+            X_train (pandas): Training set containing input variables
+            X_test (pandas): Test set containing input variables
+            y_train (pandas): Training set containing output variables
+            y_test (pandas): Test set containing output variables
+            nmodels (int, optional): Number of models to use and compare feature importance. Defaults to 6.
+        """
+        
         self.X_train = X_train
         self.X_test = X_test
         self.y_train = y_train
         self.y_test = y_test
         self.nmodels = nmodels
 
+        # List of all models used
         mod1 = Lasso()
         mod2 = RandomForestRegressor(random_state=0, n_jobs=-1)
         mod3 = AdaBoostRegressor(random_state=0)
         mod4 = GradientBoostingRegressor(random_state=0)
         mod5 = ExtraTreesRegressor(random_state=0, n_jobs=-1)
-        mod6 = xgb.XGBRegressor(
-            seed=123, gpu_id=0, tree_method='gpu_hist', random_state=0, n_jobs=-1)
+        mod6 = xgb.XGBRegressor(seed=123, gpu_id=0, tree_method='gpu_hist', random_state=0, n_jobs=-1)
 
         self.mod_list = [mod1, mod2,
                          mod3, mod4,
@@ -156,7 +196,11 @@ class multivariate_importance():
         print('')
 
     def train_models(self):
+        """Train all specified models
 
+        Returns:
+            list: List containing the R2 metric of each model
+        """
         model_r2 = []
         for model in tqdm(self.mod_list):
             model.fit(self.X_train, self.y_train)
@@ -168,14 +212,28 @@ class multivariate_importance():
         return model_r2
 
     def permutation_importance(self, model_index=1):
+        """Visualize the importance of each column based on their permutation. More info in https://www.kaggle.com/learn/machine-learning-explainability
+
+        Args:
+            model_index (int, optional): Model index tp specify which model to study. Goes from 1 to 6.  Defaults to 1.
+
+        Returns:
+            pandas: dataframe ranking each column based on feature importance
+        """
 
         self.mod_list[model_index].fit(self.X_train, self.y_train)
-        perm = PermutationImportance(self.mod_list[model_index], random_state=1).fit(
-            self.X_train, self.y_train)
+        perm = PermutationImportance(self.mod_list[model_index], random_state=1).fit(self.X_train, self.y_train)
         return eli5.show_weights(perm, feature_names=X_train.columns.tolist())
 
     def plot(self, relative=True, topn=8, absolute=True, plot_R2=True):
+        """Plot the feature importance of all specified models
 
+        Args:
+            relative (bool, optional): Normalize the feature importance by the largest feature importance. Defaults to True.
+            topn (int, optional): Number of top features displayed. Defaults to 8.
+            absolute (bool, optional): Specify whether to display the absolute feature importance or not. Defaults to True.
+            plot_R2 (bool, optional): Display the R2 metric of each model as a title. Defaults to True.
+        """
         fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(30, 18))
 
         if self.model_r2 == None:
@@ -183,38 +241,34 @@ class multivariate_importance():
             multivariate_importance.train_models(self)
             print('R2 score calculated')
 
+        # Obtaining feature importance of each model
         print('Obtaining feature importance - 0%')
-        viz1 = FeatureImportances(
-            self.mod_list[0], relative=relative, topn=topn, ax=ax[0, 0], absolute=absolute)
+        viz1 = FeatureImportances(self.mod_list[0], relative=relative, topn=topn, ax=ax[0, 0], absolute=absolute)
         viz1.fit(self.X_train, self.y_train)
         ax[0, 0].tick_params(labelsize=18)
 
-        viz2 = FeatureImportances(
-            self.mod_list[1], relative=relative, topn=topn, ax=ax[0, 1], absolute=absolute)
+        viz2 = FeatureImportances(self.mod_list[1], relative=relative, topn=topn, ax=ax[0, 1], absolute=absolute)
         viz2.fit(self.X_train, self.y_train)
         ax[0, 1].tick_params(labelsize=18)
 
-        viz3 = FeatureImportances(
-            self.mod_list[2], relative=relative, topn=topn, ax=ax[0, 2], absolute=absolute)
+        viz3 = FeatureImportances(self.mod_list[2], relative=relative, topn=topn, ax=ax[0, 2], absolute=absolute)
         viz3.fit(self.X_train, self.y_train)
         ax[0, 2].tick_params(labelsize=18)
         print('Obtaining feature importance - 50%')
-        viz4 = FeatureImportances(
-            self.mod_list[3], relative=relative, topn=topn, ax=ax[1, 0], absolute=absolute)
+        viz4 = FeatureImportances(self.mod_list[3], relative=relative, topn=topn, ax=ax[1, 0], absolute=absolute)
         viz4.fit(self.X_train, self.y_train)
         ax[1, 0].tick_params(labelsize=18)
 
-        viz5 = FeatureImportances(
-            self.mod_list[4], relative=relative, topn=topn, ax=ax[1, 1], absolute=absolute)
+        viz5 = FeatureImportances(self.mod_list[4], relative=relative, topn=topn, ax=ax[1, 1], absolute=absolute)
         viz5.fit(self.X_train, self.y_train)
         ax[1, 1].tick_params(labelsize=18)
 
-        viz6 = FeatureImportances(
-            self.mod_list[5], relative=relative, topn=topn, ax=ax[1, 2], absolute=absolute)
+        viz6 = FeatureImportances(self.mod_list[5], relative=relative, topn=topn, ax=ax[1, 2], absolute=absolute)
         viz6.fit(self.X_train, self.y_train)
         ax[1, 2].tick_params(labelsize=13)
         print('Obtaining feature importance - 100%')
 
+        # Display the R2 score as a title
         if plot_R2:
 
             ax[0, 0].set_title(
