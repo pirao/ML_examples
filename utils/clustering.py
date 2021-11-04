@@ -16,12 +16,23 @@ from sklearn.neighbors import NearestNeighbors
 
 class kmeans():
     def __init__(self, df, cat=False):
+        """Class for the unsupervised learning algorithm kmeans - clustering
 
+        Args:
+            df (pd): Pandas dataframe of the dataset
+            cat (bool, optional): Categorical columns that exist in the dataset. Used to cluster only numerical columns. Defaults to False.
+        """
         self.X = df.copy()
         self.model = None
 
     def cluster_criterion(self, n_clusters, verbose=False, normalize=True):
+        """Function for visualizing 4 different clustering criteria to help decide the optimal number of clusters
 
+        Args:
+            n_clusters (int): Number of clusters
+            verbose (bool, optional): Used to print out the metrics for each cluster number. Defaults to False.
+            normalize (bool, optional): Normalize the 4 unsupervised metrics between 0 and 1. Defaults to True.
+        """
         ine = []
         sil = []
         calinski_harabasz = []
@@ -30,16 +41,18 @@ class kmeans():
         n_range = range(2, n_clusters + 1)
         self.n_range = n_range
 
+        # Clustering algorithm
         for i in tqdm(n_range):
             kmeans = KMeans(n_clusters=i, max_iter=5000,random_state=42, init='k-means++')
             kmeans.fit(self.X)
 
-            # Elbow
-            ine.append(kmeans.inertia_)
+            # Unsupervised error metrics
+            ine.append(kmeans.inertia_)                                                               # Elbow method (approximate optimal location)
             sil.append(silhouette_score(self.X, kmeans.predict(self.X)))                              # Maximize
             calinski_harabasz.append(calinski_harabasz_score(self.X, kmeans.predict(self.X)))         # Maximize
             davies_bouldin.append(davies_bouldin_score(self.X, kmeans.predict(self.X)))               # Minimize
 
+            # Print out unsupervised metrics for each cluster number
             if verbose:
                 print('')
                 print(f'Number of groups: {i} --- Inertia: {ine[i-2]} --- Silhouette coefficient: {sil[i-2]}')
@@ -47,19 +60,20 @@ class kmeans():
                 print(f'Number of groups: {i} --- Inertia: {ine[i-2]} --- davies_bouldin: {davies_bouldin[i-2]}')
                 print('')
 
-        # Converting to numpy arrays
+        # Converting error metrics to numpy arrays
         self.ine = np.array(ine)
         self.sil = np.array(sil)
         self.calinski_harabasz = np.array(calinski_harabasz)
         self.davies_bouldin = np.array(davies_bouldin)
 
+        # Normalize the error metrics
         if normalize:
             self.ine = (self.ine-self.ine.min()) / (self.ine.max()-self.ine.min())
             self.sil = (self.sil-self.sil.min()) / (self.sil.max()-self.sil.min())
             self.calinski_harabasz = (self.calinski_harabasz-self.calinski_harabasz.min())/(self.calinski_harabasz.max()-self.calinski_harabasz.min())
             self.davies_bouldin = (self.davies_bouldin-self.davies_bouldin.min())/(self.davies_bouldin.max()-self.davies_bouldin.min())
 
-        # Index of optimal metric value
+        # Index of optimal metric value for each error metric
         kl = KneeLocator(self.n_range, self.ine, curve="convex", direction='decreasing', S=2)
         self.knee = kl.knee
         self.sil_index = np.where(self.sil == np.amax(self.sil))[0][0]
@@ -96,11 +110,18 @@ class kmeans():
         plt.show()
 
     def create_model(self, n_clusters):
-        self.model = KMeans(n_clusters=n_clusters,max_iter=5000, random_state=42)
+        """Function used to create the clustering model. It is to be used after applying the "cluster_criterion" function
+
+        Args:
+            n_clusters (int): Number of clusters
+        """
+        self.model = KMeans(n_clusters=n_clusters, max_iter=5000, random_state=42, init='k-means++')
         self.model.fit(self.X)
         return
 
     def silhouette_plot(self):
+        """Visualize the silhouette coefficient of the model (1 of the 4 error metrics)
+        """
         if not self.model:
             print("Create a clustering model first")
 
@@ -108,6 +129,11 @@ class kmeans():
         return
 
     def clustering(self):
+        """Apply the clustering model to the dataset
+
+        Returns:
+            pd: pandas dataframe with a new column containing the cluster label "cluster_kmeans"
+        """
         if not self.model:
             print("Create a clustering model first")
 
@@ -118,10 +144,20 @@ class kmeans():
         return cluster_data
 
     def save_model(self, path):
+        """Save the model inside a specific path
+
+        Args:
+            path (string): Folder path to save the model
+        """
         pickle.dump(self.model, open(path, 'wb'))
         return
 
     def load_model(self, path):
+        """Load a previously saved model
+
+        Args:
+            path (string): Folder path to load a previously saved model
+        """
         self.model = pickle.load(open(path, 'rb'))
         return
 
@@ -132,12 +168,22 @@ class kmeans():
 
 class dbscan():
     def __init__(self, data):
+        """Class for the unsupervised learning algorithm DBSCAN - clustering + noise removal
 
+        Args:
+            data (pd): Pandas dataframe of the dataset
+        """
         self.X = data.copy()
         self.model = None
 
     def plot_baseline_eps(self):
+        """Function used to verify the nearest neightbors of the dataset in order to estimate the optimal value of the hyperparameter epsilon (eps) based
+        on the methodology proposed by Elbatta, 2012.
+        
+        In practice, this serves as a way of limiting the range that this hyperparameter can be it. The user must later manually decide the value of this parameter
+        """
 
+        # Nearest neighbor algorithm
         nbrs = NearestNeighbors(n_neighbors=3).fit(self.X)
         dists, inds = nbrs.kneighbors(self.X)
 
@@ -147,8 +193,9 @@ class dbscan():
         dists = dists[:, -1]
 
         n_range = np.arange(0, len(dists), 1)
+        
+        # Obtain knee to determine the approximate location of the optimal eps value. 
         kl = KneeLocator(n_range, dists, curve="convex",direction='increasing', S=3)
-        #kl.plot_knee()
         self.knee = kl.knee
 
         # Plot baseline eps
@@ -164,11 +211,21 @@ class dbscan():
         return
 
     def plot_hyperparameters(self, nrows, ncols, eps_list=[0.026, 0.029, 0.032], min_samples_list=[10, 15, 20], figsize=(15, 20), remove_outliers=True):
+        """Plot the combinations of the hyperparameters epsilon and minimum number of samples in order to decide the best combination. 
 
+        Args:
+            nrows (int): Number of rows 
+            ncols (int): Number of columns 
+            eps_list (list, optional): List of epsilon values. Please define after using the method "plot_baseline_eps". Defaults to [0.026, 0.029, 0.032].
+            min_samples_list (list, optional): List of minimum number of samples. Defaults to [10, 15, 20].
+            figsize (tuple, optional): Figure size. Defaults to (15, 20).
+            remove_outliers (bool, optional): Remove the outliers from the visualizations or not. Defaults to True.
+        """
         fig, ax = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize,tight_layout=True, sharey=True, sharex=True)
         ax = ax.reshape((nrows*ncols,))
 
         index = 0
+        # For loop to test all combinations of hyperparamters
         for eps in tqdm(eps_list):
             for min_sample in min_samples_list:
                 dbscan = DBSCAN(eps=eps, min_samples=min_sample).fit(self.X)
@@ -176,6 +233,7 @@ class dbscan():
                 cluster_data = self.X.copy()
                 cluster_data['cluster_dbscan'] = self.Y_
 
+                # Remove outliers from visualization
                 if remove_outliers:
                     df_in = cluster_data.loc[(
                         cluster_data['cluster_dbscan'] != -1)]
@@ -192,12 +250,25 @@ class dbscan():
         return
 
     def create_model(self, eps, msamples=5):
+        """[summary]
+
+        Args:
+            eps (float): The maximum distance between two samples for one to be considered as in the neighborhood of the other. This is not a maximum bound
+            on the distances of points within a cluster. This is the most important DBSCAN parameter to choose appropriately for your data set and distance function.
+            
+            msamples (int, optional): The number of samples (or total weight) in a neighborhood for a point to be considered as a core point.
+            This includes the point itself. Defaults to 5.
+        """
         self.model = DBSCAN(eps=eps, min_samples=msamples, n_jobs=-1)
         self.model.fit(self.X)
         return
 
     def clustering(self):
+        """Apply the clustering model to the dataset
 
+        Returns:
+            pd: pandas dataframe with a new column containing the cluster label "cluster_dbscan"
+        """
         if not self.model:
             print("Create a model first using the create model method ")
 
@@ -207,10 +278,20 @@ class dbscan():
         return cluster_data
 
     def save_model(self, path):
+        """Save the model inside a specific path
+
+        Args:
+            path (string): Folder path to save the model
+        """
         pickle.dump(self.model, open(path, 'wb'))
         return
 
     def load_model(self, path):
+        """Load a previously trained model from a specific path
+
+        Args:
+            path (string): Folder path to load the model from
+        """
         self.model = pickle.load(open(path, 'rb'))
         return
 
@@ -221,11 +302,11 @@ class dbscan():
 
 class GMM():
     def __init__(self, data):
-        '''
-        Objeto que cria um modelo GMM.
-        I/O:
-            data: conjunto de dados contendo os dados do VI.
-        '''
+        """Class for the unsupervised learning algorithm GMM - clustering 
+
+        Args:
+            data (pd): Pandas dataframe of the dataset
+        """
         self.X = data.copy()
         self.model = None
 
@@ -268,23 +349,30 @@ class GMM():
 
         plt.show()
 
-    def create_model(self, cv_type, n_clusters):
         '''
         Método que cria o modelo de misturas gausianas.
         I/O:
             cv_type: string que indica o tipo de covariança usada para a definição do modelo ("spherical", "tied", "diag" ou "full");
             n_cluster: inteiro que indica o número de grupos existentes no conjunto de dados.
         '''
+
+    def create_model(self, cv_type, n_clusters):
+        """Method that created the GMM model
+
+        Args:
+            cv_type (string): Type of covariance used to define the model ("spherical", "tied", "diag" ou "full"). 
+            n_clusters (int): Number of clusters 
+        """
         self.model = GaussianMixture(
             n_components=n_clusters, covariance_type=cv_type, max_iter=5000, random_state=42)
         self.model.fit(self.X)
 
     def clustering(self):
-        '''
-        Método que realiza o clustering do conjunto de dados trabalhado.
-        I/O:
-            return cluster_data: um pandas dataframe contendo o conjunto de dados com o rótulo dos agrupamentos feitos pelo modelo.
-        '''
+        """Apply the clustering model to the dataset
+
+        Returns:
+            pd: pandas dataframe with a new column containing the cluster label "cluster_dbscan"
+        """
         if not self.model:
             print("Crie um modelo com o método create_model.")
 
@@ -295,17 +383,19 @@ class GMM():
         return cluster_data
 
     def save_model(self, path):
-        '''
-        Método que salva o modelo criado.
-        I/O:
-            path: string indicando o caminho do objeto referente ao modelo.
-        '''
+        """Save the model inside a specific path
+
+        Args:
+            path (string): Folder path to save the model
+        """
         pickle.dump(self.model, open(path, 'wb'))
+        return
 
     def load_model(self, path):
-        '''
-        Método que carrega um modelo previamente criado.
-        I/O:
-            path: string indicando o caminho do objeto referente ao modelo.
-        '''
+        """Load a previously trained model from a specific path
+
+        Args:
+            path (string): Folder path to load the model from
+        """
         self.model = pickle.load(open(path, 'rb'))
+        return

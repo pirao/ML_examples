@@ -12,6 +12,7 @@ from sklearn.feature_selection import SelectKBest, f_regression, chi2
 from sklearn.linear_model import Lasso
 from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor, GradientBoostingRegressor, ExtraTreesRegressor
 from sklearn.metrics import mean_squared_error, f1_score, accuracy_score, mean_absolute_error, r2_score
+from sklearn.feature_selection import SelectFromModel
 
 from yellowbrick.regressor import residuals_plot, prediction_error
 from yellowbrick.model_selection import learning_curve, feature_importances, FeatureImportances
@@ -150,6 +151,29 @@ def scatterplot_pearson(df, x_vars, y_vars, cmap='viridis', hue='Class', height=
     g.tight_layout()
     plt.setp(g._legend.get_title(), fontsize='20')  # for legend title
     return g
+
+
+################################
+# Univariate feature selection
+################################
+
+# with the following function we can select highly correlated features
+# it will remove the first feature that is correlated with anything other feature
+
+# https://github.com/krishnaik06/Complete-Feature-Selection/blob/master/2-Feature%20Selection-%20Correlation.ipynb
+
+def correlation(dataset, threshold):
+    col_corr = set()  # Set of all the names of correlated columns
+    corr_matrix = dataset.corr()
+    for i in range(len(corr_matrix.columns)):
+        for j in range(i):
+            # we are interested in absolute coeff value
+            if abs(corr_matrix.iloc[i, j]) > threshold:
+                colname = corr_matrix.columns[i]  # getting the name of column
+                col_corr.add(colname)
+    return col_corr
+
+
 
 
 ##############################################
@@ -293,3 +317,24 @@ class multivariate_importance():
 
         plt.tight_layout()
         return
+
+
+############################
+# Multivariate feature selection
+############################
+
+def multi_corr_select(X,y,threshold):
+    mdl = ExtraTreesRegressor(n_estimators=100, n_jobs=-1, random_state=0)
+    mdl.fit(X, y)
+    
+    selector = SelectFromModel(estimator=mdl, threshold=str(threshold)+'*mean')
+    selector.fit(X, y)
+    
+#The threshold value to use for feature selection. Features whose importance is greater or equal are kept while the others are discarded.
+# If “median” (resp. “mean”), then the threshold value is the median (resp. the mean) of the feature importances.
+    
+    selected_feat = X.columns[(selector.get_support())]
+    
+    print('Features selected by SelectFromModel:',selector.get_support())
+    print('Number of features: ', len(selected_feat))
+    return X[selected_feat], y

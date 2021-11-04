@@ -7,6 +7,11 @@ from scipy.fft import fft, fftfreq, ifft, fft2,ifft2
 from scipy.signal import welch, butter, filtfilt
 
 
+from sklearn.metrics import mean_squared_error, f1_score, accuracy_score, mean_absolute_error, r2_score
+from sklearn.model_selection import cross_val_score, train_test_split, KFold, StratifiedShuffleSplit, TimeSeriesSplit, RepeatedKFold
+from sklearn.preprocessing import StandardScaler, LabelEncoder, OneHotEncoder, RobustScaler
+
+
 def get_file_names(folder_path,returns=True):
     """This function obtain a list of all files inside a specific folder
 
@@ -100,3 +105,27 @@ def cut_date_decimal_places(df, column, position=-5):
         df_cut = pd.DataFrame(date_strings)
 
     return df_cut
+
+
+########################################
+# Split dataset
+#####################################
+
+def create_scaled_dataset(X, y, test_size=0.2,shuffle=True):
+    """[summary]
+
+    Args:
+        X (pandas): Input dataset
+        y (pandas): Target variable
+        test_size (float, optional): Size of the test set. Defaults to 0.2.
+        shuffle (bool, optional): Shuffle the dataset. Defaults to True.
+
+    Returns:
+        [type]: Scaled datasets split into train and test sets.
+    """
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=0, shuffle=shuffle)
+
+    std_scaler = StandardScaler()
+    X_scaled_train = pd.DataFrame(std_scaler.fit_transform(X_train), columns=X_train.columns, index=X_train.index)
+    X_scaled_test = pd.DataFrame(std_scaler.transform(X_test), columns=X_test.columns, index=X_test.index)
+    return X_scaled_train, X_scaled_test, y_train, y_test
