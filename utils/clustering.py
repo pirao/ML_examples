@@ -1,7 +1,5 @@
-import pandas as pd
 import seaborn as sns
 import numpy as np
-import scipy as sp
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import pickle
@@ -9,17 +7,73 @@ import pickle
 from sklearn.mixture import GaussianMixture
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
-from sklearn.decomposition import PCA
 from kneed import KneeLocator
 from yellowbrick.cluster import silhouette_visualizer
 from sklearn.neighbors import NearestNeighbors
 
-class kmeans():
-    def __init__(self, df, cat=False):
+class _clustering():
 
+    def __init__(self, df, cat=False):
         self.X = df.copy()
         self.model = None
 
+
+    def clustering(self, X):
+        """Predict the labels for the data samples in X using trained model.
+
+
+
+        Args:
+            X (array-like of shape (n_samples, n_features)): List of n_features-dimensional data points. Each row corresponds to a single data point.
+
+        Returns:
+            labels (array, shape (n_samples,): Component labels.
+        """
+        if not self.model:
+            print("Create a clustering model first")
+
+        else:
+            self.Y_ = self.model.predict(X)
+            cluster_data = self.X.copy()
+            cluster_data['cluster'] = self.Y_
+
+        return cluster_data
+        
+    def get_data(self):
+        """Get method for the class dataset
+
+        Returns:
+            array like (n_samples, n_features): returns the class dataset
+        """
+        return self.X
+
+    def get_model(self):
+        """Get method for the class model
+
+        Returns:
+            clustering model: returns the child respective clustering model
+        """
+        if not self.model:
+            print("Create a clustering model first")
+        return self.model
+    
+    def save_model(self, path):
+        if not self.model:
+            print("There is no model to save")
+        pickle.dump(self.model, open(path, 'wb'))
+        return
+
+    def load_model(self, path):
+        self.model = pickle.load(open(path, 'rb'))
+        return
+
+
+
+class kmeans(_clustering):
+
+    def __init__(self,data):
+        super().__init__(data)
+    
     def cluster_criterion(self, n_clusters, verbose=False, normalize=True):
 
         ine = []
@@ -94,48 +148,25 @@ class kmeans():
 
         plt.tight_layout()
         plt.show()
-
+    
     def create_model(self, n_clusters):
         self.model = KMeans(n_clusters=n_clusters,max_iter=5000, random_state=42)
         self.model.fit(self.X)
         return
-
+    
     def silhouette_plot(self):
         if not self.model:
             print("Create a clustering model first")
-
-        silhouette_visualizer(self.model, self.X)
+        
+        else:
+            silhouette_visualizer(self.model, self.X)
+        
         return
 
-    def clustering(self):
-        if not self.model:
-            print("Create a clustering model first")
-
-        self.Y_ = self.model.predict(self.X)
-        cluster_data = self.X.copy()
-        cluster_data['cluster_kmeans'] = self.Y_
-
-        return cluster_data
-
-    def save_model(self, path):
-        pickle.dump(self.model, open(path, 'wb'))
-        return
-
-    def load_model(self, path):
-        self.model = pickle.load(open(path, 'rb'))
-        return
-
-####################################
-# DBSCAN
-#####################################
-
-
-class dbscan():
-    def __init__(self, data):
-
-        self.X = data.copy()
-        self.model = None
-
+class dbscans(_clustering):
+    def __init__(self,data):
+        super().__init__(data)
+    
     def plot_baseline_eps(self):
 
         nbrs = NearestNeighbors(n_neighbors=3).fit(self.X)
@@ -191,121 +222,188 @@ class dbscan():
                 index = index + 1
         return
 
+    def clustering(self):
+
+        if not self.model:
+            print("Create a clustering model first")
+
+        else:
+            self.Y_ = self.model.labels_
+            cluster_data = self.X.copy()
+            cluster_data['cluster_dbscan'] = self.Y_
+            return cluster_data
+
     def create_model(self, eps, msamples=5):
         self.model = DBSCAN(eps=eps, min_samples=msamples, n_jobs=-1)
         self.model.fit(self.X)
         return
 
-    def clustering(self):
-
-        if not self.model:
-            print("Create a model first using the create model method ")
-
-        self.Y_ = self.model.labels_
-        cluster_data = self.X.copy()
-        cluster_data['cluster_dbscan'] = self.Y_
-        return cluster_data
-
-    def save_model(self, path):
-        pickle.dump(self.model, open(path, 'wb'))
-        return
-
-    def load_model(self, path):
-        self.model = pickle.load(open(path, 'rb'))
-        return
 
 
-##############################
-# Gaussian mixture model
-##############################
+class GMM(_clustering):
+    
+    def __init__(self,data):
+        super().__init__(data)
 
-class GMM():
-    def __init__(self, data):
-        '''
-        Objeto que cria um modelo GMM.
-        I/O:
-            data: conjunto de dados contendo os dados do VI.
-        '''
-        self.X = data.copy()
-        self.model = None
+    cv_types = ['spherical', 'tied', 'diag', 'full']
+    
 
-    def BIC_criterion(self, n_clusters, gradient=False, verbose=False):
-        '''
-        Método que verifica o critério de BIC para definição no número de grupos ideal para o agrupamento.
-        I/O:
-            n_clusters: inteiro que indica o número máximo de clusters participantes do critério;
-            gradient: booleano que indica quando a curva plotada deve ser a curva gradiente do BIC ou não;
-            verbose: booleano que indica se deve ser informado, ou não, o andamento do cálculo do BIC.
-        '''
-        bic = []
-        n_range = range(1, n_clusters + 1)
-        cv_types = ['spherical', 'tied', 'diag', 'full']
+    def __plot_scores(self, n_clusters, sil, calinski_harabasz, davies_bouldin, bic, normalize = True):
 
-        for cv_type in tqdm(cv_types):
-            type_bic = []
-            for i in n_range:
-                gmm = GaussianMixture(
-                    n_components=i, covariance_type=cv_type, max_iter=5000, random_state=42)
-                gmm.fit(self.X)
-                temp_bic = gmm.bic(self.X)
-                type_bic.append(temp_bic)
-                if verbose:
-                    print(
-                        f'Tipo da covariância: {cv_type} --- Número de agrupamentos: {i} --- BIC: {temp_bic}')
-            bic.append(type_bic)
-        bic = np.array(bic)
+        n_range = range(2, n_clusters + 1)
+        fig, ax = plt.subplots(nrows=2, ncols=2, sharex=True, figsize=(18, 10))
+        sil_y_max = sil.max()
+        cal_y_max = calinski_harabasz.max()
+        dav_y_max = davies_bouldin.max()
+        bic_y_max = bic.max()
+        
+        
+        yticks = [i/4 for i in range(5)]
 
-        if gradient:
-            bic = np.array([np.gradient(array) for array in bic])
+        plt.setp(ax[1], xlabel='Number of groups')
+        [plt.setp(ax[i][0], ylabel = "Score") for i in range(0,2)]
+        plt.setp(ax[0][0],title = "Silhouette")
+        plt.setp(ax[0][1],title = "Calinski Harabasz")
+        plt.setp(ax[1][0],title = "Davies Boudini")
+        plt.setp(ax[1][1],title = "BIC")
 
-        fig, ax = plt.subplots(figsize=(10, 10))
-        for i in range(len(cv_types)):
-            ax.plot(n_range, bic[i, :], label=cv_types[i])
-        ax.set_xticks(n_range)
-        ax.legend()
-        ax.set_xlabel("Número de agrupamentos")
-        ax.set_ylabel("BIC")
 
+        sil_index = np.where(sil == np.amax(sil))[0][0]%(n_clusters-1)
+        cal_index = np.where(calinski_harabasz == np.amax(calinski_harabasz))[0][0]%(n_clusters-1)
+        dav_index = np.where(davies_bouldin == np.amin(davies_bouldin))[0][0]%(n_clusters-1)
+        bic_index = np.where(bic == np.amin(bic))[0][0]%(n_clusters-1)
+
+
+        ax[0][0].axvline(x=n_range[sil_index],ymax = sil_y_max, color='red', linestyle='--', label = "optimal")
+        ax[0][1].axvline(x=n_range[cal_index], ymax=cal_y_max, color='red', linestyle='--', label = "optimal")
+        ax[1][0].axvline(x=n_range[dav_index],ymax=dav_y_max, color='red', linestyle='--', label = "optimal")
+        ax[1][1].axvline(x=n_range[bic_index],ymax=bic_y_max, color='red', linestyle='--', label = "optimal")
+        
+        for i in range(4):
+                
+            sil_sub = [sil[(n_clusters-1)*i + k] for k in range(0,n_clusters-1)]
+            cal_sub = [calinski_harabasz[(n_clusters-1)*i + k] for k in range(0,n_clusters-1)]
+            dav_sub = [davies_bouldin[(n_clusters-1)*i + k] for k in range(0,n_clusters-1)]
+            bic_sub = [bic[(n_clusters-1)*i + k] for k in range(0,n_clusters-1)]
+
+            ax[0][0].plot(n_range, sil_sub, label=self.cv_types[i])
+            ax[0][1].plot(n_range, cal_sub, label=self.cv_types[i])
+            ax[1][0].plot(n_range, dav_sub, label=self.cv_types[i])
+            ax[1][1].plot(n_range, bic_sub, label=self.cv_types[i])
+            
+        [[ax[i][j].set_xticks(n_range) and ax[i][j].legend() for j in range(0,2)] for i in range(0,2)]
+        plt.tight_layout()  
         plt.show()
 
-    def create_model(self, cv_type, n_clusters):
-        '''
-        Método que cria o modelo de misturas gausianas.
-        I/O:
-            cv_type: string que indica o tipo de covariança usada para a definição do modelo ("spherical", "tied", "diag" ou "full");
-            n_cluster: inteiro que indica o número de grupos existentes no conjunto de dados.
-        '''
-        self.model = GaussianMixture(
-            n_components=n_clusters, covariance_type=cv_type, max_iter=5000, random_state=42)
+
+    def criterion_analysis(self, n_clusters=2, verbose=False, normalize = True):
+        """Calculates and displays the silhouette, calinski harabasz and davies boudin scores for each covariance type and 2...n_clusters range.
+
+        Args:
+            n_clusters (int): The number of mixture components. Defaults to 2.
+            verbose (bool, optional): Enable verbose output. If 1 then it prints the current initialization and each iteration step. 
+            normalize (bool, optional): if true then the scores are shown normalized. Defaults to True.
+        """
+    
+        n_range = range(2, n_clusters + 1)
+        self.n_range = n_range
+
+        #intialize the score arrays
+        sil = np.zeros(4*(n_clusters-1))
+        calinski_harabasz = np.zeros(4*(n_clusters-1))
+        davies_bouldin = np.zeros(4*(n_clusters-1))
+        bic = np.zeros(4*(n_clusters-1))
+        it = 0
+        
+        #loops between each covariance type
+        for cv_type in tqdm(self.cv_types):
+
+            #creates a model for each cluster group using the current covariance type
+            for i in n_range:
+                
+                gmm = GaussianMixture(n_components=i, covariance_type=cv_type, max_iter=5000, random_state=42)
+                gmm.fit(self.X)
+                
+                #saves the scores
+                sil[it] = silhouette_score(self.X, gmm.predict(self.X))                             # Maximize
+                calinski_harabasz[it] = calinski_harabasz_score(self.X, gmm.predict(self.X))        # Maximize
+                davies_bouldin[it] = davies_bouldin_score(self.X, gmm.predict(self.X))              # Minimize
+                bic[it] = gmm.bic(self.X)                                                           # Minimize
+                
+
+                if verbose:
+                    print(f'Tipo da covariância: {cv_type} - Número de agrupamentos: {i}\n    BIC: {bic[it]}\n    Silhouette: {sil[it]}\n    Davies Bouldin: {davies_bouldin[it]}\n    Calinski Harabasz: {calinski_harabasz[it]}\n')
+                it+=1
+
+        #normalizing the scores
+        if normalize:
+            sil = (sil-sil.min()) / (sil.max()-sil.min())
+            calinski_harabasz = (calinski_harabasz-calinski_harabasz.min())/(calinski_harabasz.max()-calinski_harabasz.min())
+            davies_bouldin = (davies_bouldin-davies_bouldin.min())/(davies_bouldin.max()-davies_bouldin.min())
+            bic = (bic-bic.min())/(bic.max()-bic.min())
+
+
+        #plot the scores
+        self.__plot_scores(n_clusters, sil, calinski_harabasz, davies_bouldin, bic, normalize=normalize)
+        
+    
+    def create_model(self, cv_type, n_clusters= 2):
+        """Create a Gaussian Mixture Model  fitting its class data
+
+        Args:
+            cv_type (String): Describes the type of covariance parameters to use. Must be one of:
+                ‘full’
+                each component has its own general covariance matrix
+
+                ‘tied’
+                all components share the same general covariance matrix
+
+                ‘diag’
+                each component has its own diagonal covariance matrix
+
+                ‘spherical’
+                each component has its own single variance
+
+            n_clusters (int): The number of mixture components. Defaults to 2.
+        """
+
+        #create the model using the given parameters
+        self.model = GaussianMixture(n_components=n_clusters, covariance_type=cv_type, max_iter=5000, random_state=42)
+        #fit the model using its data
         self.model.fit(self.X)
 
-    def clustering(self):
-        '''
-        Método que realiza o clustering do conjunto de dados trabalhado.
-        I/O:
-            return cluster_data: um pandas dataframe contendo o conjunto de dados com o rótulo dos agrupamentos feitos pelo modelo.
-        '''
+        return
+
+
+    def clustering(self, X, prob_threshold = 0):
+        """Classify the labels for the data samples in X using trained model, and detect outliers using the prob_threshold value.
+
+        Args:
+            X (array-like of shape (n_samples, n_features)): List of n_features-dimensional data points. Each row corresponds to a single data point. prob_threshold (int, optional): threshold for interpolation region or outlier detection. If the score of a given point is below the threshold, it is classified as a outlier. Defaults to 0.
+
+        Returns:
+            labels (n_samples, n_features): Component labels. -1 for outliers.
+        """
         if not self.model:
-            print("Crie um modelo com o método create_model.")
+            print("Create a clustering model first")
 
-        self.Y_ = self.model.predict(self.X)
-        cluster_data = self.X.copy()
-        cluster_data['cluster'] = self.Y_
+        else:
+            #predicts the give data
+            self.Y_ = self.model.predict(X)
+            cluster_data = X.copy()
+            cluster_data['cluster'] = self.Y_
 
+
+            #creates a array with scores of each prediction
+            k = np.array(self.model.score_samples(X))
+            #normalize the array betweeen 0 and 1
+            k = (k-k.min()) / (k.max()-k.min())
+
+            #creates a new column with the normalized scores
+            cluster_data["scores"] = k
+
+            #set a new cluster group with the possible anomalies in the dataset
+            cluster_data.loc[cluster_data['scores'] < prob_threshold, 'cluster'] = -1
+            
+        #returns the labeled data
         return cluster_data
-
-    def save_model(self, path):
-        '''
-        Método que salva o modelo criado.
-        I/O:
-            path: string indicando o caminho do objeto referente ao modelo.
-        '''
-        pickle.dump(self.model, open(path, 'wb'))
-
-    def load_model(self, path):
-        '''
-        Método que carrega um modelo previamente criado.
-        I/O:
-            path: string indicando o caminho do objeto referente ao modelo.
-        '''
-        self.model = pickle.load(open(path, 'rb'))

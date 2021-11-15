@@ -9,7 +9,7 @@ from sklearn import neighbors, linear_model, ensemble
 import lightgbm as lgbm
 from sklearn.metrics import mean_squared_error
 import numpy as np
-from source.source import calculate_metrics
+from source import calculate_metrics
 from sklearn.linear_model import RidgeCV, ElasticNet
 from tqdm import tqdm
 
