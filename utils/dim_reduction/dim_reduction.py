@@ -294,36 +294,53 @@ class ArbitraryCutStrategy:
 #  TSNE
 #########################
 
-class tsne_plot():
-    def __init__(self, data):
-        
-        self.df = data.copy()
-        self.df_type = df_type
+class T_SNE():
 
-    def plot2D(self, **kwargs):
+    def __init__(self, n_components=2, perplexity=30, random_state=42, early_exaggeration=12):
+        '''
+        Um objeto que plota o tsne de dados quaisquer.
+        I/O:
+            data: um pandas dataframe contendo os dados a sofrerem redução dimensional;
+        '''
+        self.early_exaggeration = early_exaggeration
+        self.n_components = n_components
+        self.perplexity = perplexity
+        self.random_state = random_state
 
-        tsne = TSNE(n_components=2, random_state=42, **kwargs)
-        plot_data = tsne.fit_transform(self.df)
-        plot_data = pd.DataFrame(plot_data, columns=['C1', 'C2'])
+        self.tsne = TSNE(n_components=n_components, random_state=random_state, perplexity=perplexity,
+                         early_exaggeration=early_exaggeration)
 
-        fig, ax = plt.subplots(figsize=(20, 10))
-        ax.set_xlabel('C1', size=20)
-        ax.set_ylabel('C2', size=20)
-        plt.xticks(size=20)
-        plt.yticks(size=20)
-        sns.scatterplot(data=plot_data, x='C1', y='C2', ax=ax)
+    def fit(self, X):
+        self.data = self.tsne.fit_transform(X)
+        columns = ['C' + str(i + 1) for i in range(self.data.shape[1])]
+        self.data = pd.DataFrame(self.data, columns=columns)
+        return self.data.copy()
 
-        plt.show()
+    def get_data(self):
+        return self.data.copy()
 
-    def plot3D(self, **kwargs):
+    def plot(self):
+        '''
+        Uma função que realiza o plot 2D do TSNE.
+        I/O:
+            kwargs: parâmetros do método TSNE do sklearn.manifold.
+        '''
+        if self.data.shape[1] == 2:
+            fig, ax = plt.subplots(figsize=(20, 10))
+            ax.set_xlabel('C1', size=20)
+            ax.set_ylabel('C2', size=20)
+            plt.xticks(size=20)
+            plt.yticks(size=20)
+            sns.scatterplot(data=self.data, x='C1', y='C2', ax=ax)
+            plt.show()
 
-        tsne = TSNE(n_components=3, random_state=42, **kwargs)
-        plot_data = tsne.fit_transform(self.df)
-        plot_data = pd.DataFrame(plot_data, columns=['C1', 'C2', 'C3'])
+        elif self.data.shape[1] == 3:
 
-        fig = px.scatter_3d(data_frame=plot_data,
-                                x='C1', y='C2', z='C3',
-                                width=800, height=800)
+            fig = px.scatter_3d(data_frame=self.data, x='C1', y='C2', z='C3', width=800, height=800)
+            plt.show()
 
-        fig.show()
+        else:
+            print("This method is only avaliable for 2-3 tsne components")
+
         return
+
