@@ -479,16 +479,16 @@ class GMM(_clustering):
 
         Args:
             cv_type (String): Describes the type of covariance parameters to use. Must be one of:
-                ‘full’
+                'full'
                 each component has its own general covariance matrix
 
-                ‘tied’
+                'tied'
                 all components share the same general covariance matrix
 
-                ‘diag’
+                'diag'
                 each component has its own diagonal covariance matrix
 
-                ‘spherical’
+                'spherical'
                 each component has its own single variance
 
             n_clusters (int): The number of mixture components. Defaults to 2.
