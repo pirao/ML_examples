@@ -15,16 +15,16 @@ from optht import optht
 #  PCA
 #########################
 
-class PCA():
+class PCA:
     """
-    Compiles the defaut steps for a PCA usage, adding different methods for dimensional
-    reduction and graph plottings for visualization and analyzes.
+    Compiles the default steps for a PCA usage, adding different methods for dimensional
+    reduction and graph plotting for visualization and analyzes.
     """
 
     def __init__(self, X, strategy='oht', n_components=.9):
         """
         Validates the input data, normalizes it for variance 1 and mean 0, creates the
-        PCA model and calculates the cutoff based on the choosen dimensional reduction
+        PCA model and calculates the cutoff based on the chosen dimensional reduction
         method.
 
         Args:
@@ -97,7 +97,6 @@ class PCA():
         Returns:
             numpy.ndarray: PCA's cumulative explained variance ratio.
         """
-        #svs = self._get_singular_values()
         svs = self.pca.explained_variance_
         return np.cumsum(svs / sum(svs))
 
@@ -134,10 +133,9 @@ class PCA():
             log_y=log
         )
 
-        
         if self.strategy == 'oht':
             fig.add_hline(
-                y=cumsum[self.get_sv_index_cut()], 
+                y=cumsum[self.get_sv_index_cut()-1],
                 line_dash='dash', 
                 line_color='orange', 
                 annotation_text='Optimal Hard Threshold'
@@ -150,7 +148,7 @@ class PCA():
             )
         elif self.strategy == 'arbitrary cut':
             fig.add_hline(
-                y=self.n_components, 
+                y=self.n_components,
                 line_dash='dash', 
                 line_color='red', 
                 annotation_text=f'Arbitrary {(self.get_sv_index_cut() * 100):.1f}% Threshold', 
@@ -196,7 +194,7 @@ class PCA():
 
         if self.strategy == 'oht':
             fig.add_hline(
-                y=svs[self.get_sv_index_cut()], 
+                y=svs[self.get_sv_index_cut()-1],
                 line_dash='dash', 
                 line_color='orange', 
                 annotation_text='Optimal Hard Threshold'
