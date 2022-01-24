@@ -344,7 +344,7 @@ class dbscans(_clustering):
 
     def create_model(self, eps, msamples=5):
 
-        self.model = DBSCAN(eps=eps, min_samples=msamples, n_jobs=-1)
+        self.model = DBSCAN(eps=eps, min_samples=msamples, n_jobs=-1, algorithm='ball_tree')
         self.model.fit(self.X)
 
         return
