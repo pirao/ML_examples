@@ -8,7 +8,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from optht import optht
+from .optht import optht
 
 
 #########################
@@ -49,6 +49,7 @@ class PCA:
 
         self.strategy = strategy
         self.n_components = n_components
+        self.prc_components = n_components if n_components < 1 else n_components / self.X.shape[1]
 
         self.pca = SKLPCA()
         self.pca.fit(self.X_normalized)
@@ -148,7 +149,7 @@ class PCA:
             )
         elif self.strategy == 'arbitrary cut':
             fig.add_hline(
-                y=self.n_components,
+                y=self.prc_components,
                 line_dash='dash', 
                 line_color='red', 
                 annotation_text=f'Arbitrary {(self.get_sv_index_cut() * 100):.1f}% Threshold', 
