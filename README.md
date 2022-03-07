@@ -10,3 +10,13 @@ This repository contains sample code for supervised and unsupervised learning as
 - Dimensionality reduction (PCA and PCA optimal thresholding)
 - Exploratory data analysis (EDA) functions: boxplot, heatmaps, pairplots, etc.
 - Feature selection based on univariate and multivariate correlation
+
+# Install
+
+To install, simply run the command
+
+```
+$ pip install -e .
+```
+
+while in the project's folder.
