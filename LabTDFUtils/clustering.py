@@ -295,35 +295,60 @@ class dbscans(_clustering):
 
         return
 
-    def plot_hyperparameters(self, nrows, ncols, max_eps=0.3, max_samples=20, figsize=(16, 16), remove_outliers=True):
+    def plot_hyperparameters(self, eps_list = [0.1, 0.15,0.2,0.25,0.3], min_samples = [5,10,15,20,25], figsize=(22, 22), remove_outliers=False):
+        
+        columns = self.X.columns
 
-        fig, ax = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize, tight_layout=True, sharey=True, sharex=True)
-        ax = ax.reshape((nrows * ncols,))
+        df_size = len(columns)
 
-        knee, dists = self.get_baseline_eps()
+        if(df_size > 3):
+            print("This method is only avaliable for 1,2, and 3 dimensional datasets.")
+            return
+        
+        nrows = len(eps_list);
+        ncols = len(min_samples)
 
-        eps_list = my_range(dists[knee], max_eps, (max_eps - dists[knee]) / (ncols))
-        eps_list = [round(i, 3) for i in eps_list]
-        min_samples_list = my_range(10, max_samples, (max_samples - 10) / nrows)
-        min_samples_list = [round(i) for i in min_samples_list]
+        if(df_size != 3):
+            fig, ax = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize, tight_layout=True, sharey=True, sharex=True)
+            ax = ax.reshape((nrows * ncols,))
+            index = 0
 
-        index = 0
+
+        else:
+            fig = plt.figure(figsize=figsize)
+            index = 1
+
 
         for eps in tqdm(eps_list):
-            for min_sample in min_samples_list:
+
+            for min_sample in min_samples:
 
                 dbscan = DBSCAN(eps=eps, min_samples=min_sample).fit(self.X)
+                labels = dbscan.labels_
 
                 cluster_data = self.X.copy()
-                cluster_data['cluster_dbscan'] = dbscan.labels_
+                cluster_data['cluster_dbscan'] = labels
 
                 if remove_outliers:
                     cluster_data = remove_outliers_(cluster_data, 'cluster_dbscan')
 
-                sns.scatterplot(data=cluster_data, x='PC1', y='PC2', hue='cluster_dbscan', ax=ax[index], palette='Set1',
-                                legend=False)
-
-                ax[index].set_title('eps = ' + str(eps) + ', min sample = ' + str(min_sample))
+                
+                if(df_size == 1):
+                    x_axis = list(range(len(cluster_data)))
+                    sns.scatterplot(data=cluster_data, x = x_axis, y = columns[0], hue='cluster_dbscan', ax=ax[index], palette='Set1',
+                    legend=False)
+                elif(df_size == 2):
+                    sns.scatterplot(data=cluster_data, x = columns[0], y = columns[1], hue='cluster_dbscan', ax=ax[index], palette='Set1',
+                    legend=False)
+                
+                else:
+                    ax = fig.add_subplot(nrows, ncols, index, projection='3d')
+                    ax.scatter(cluster_data[columns[0]],cluster_data[columns[1]],cluster_data[columns[1]], c = labels)
+                    ax.set_title('eps = ' + str(eps) + ', min sample = ' + str(min_sample))
+                    
+                if(df_size!=3):
+                    ax[index].set_title('eps = ' + str(eps) + ', min sample = ' + str(min_sample))
+                
                 index += 1
 
         plt.show()
@@ -348,8 +373,6 @@ class dbscans(_clustering):
         self.model.fit(self.X)
 
         return
-
-
 class GMM(_clustering):
 
     def __init__(self, data):
