@@ -3,8 +3,17 @@ import seaborn as sns
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from sqlalchemy import false
 from tqdm import tqdm
 import pickle
+
+has_rapids_env = True
+try:
+    from cuml.cluster import KMeans as cu_KMeans
+    from cuml.cluster import DBSCAN as cu_DBSCAN
+except ModuleNotFoundError:
+    has_rapids_env = False
+
 
 from sklearn.mixture import GaussianMixture
 from sklearn.cluster import KMeans, DBSCAN
@@ -165,8 +174,16 @@ class _clustering():
 
 class kmeans(_clustering):
 
-    def __init__(self, data):
+    def __init__(self, data, use_cuda = False):
         super().__init__(data)
+        if(use_cuda):
+            if(has_rapids_env):
+                self.use_cuda = use_cuda
+            else:
+                self.use_cuda = False;
+                print("No rapids enviroments found.\nMoving to default KMeans instead.")
+        else:
+            self.use_cuda = False;
 
     def cluster_evaluation(self, n_clusters, verbose=False, normalize=True):
 
@@ -231,7 +248,10 @@ class kmeans(_clustering):
         plt.show()
 
     def create_model(self, n_clusters):
-        self.model = KMeans(n_clusters=n_clusters, max_iter=5000, random_state=42)
+        if(self.use_cuda):
+            self.model = cu_KMeans(n_clusters=n_clusters, max_iter=5000, random_state=42)
+        else:
+            self.model = KMeans(n_clusters=n_clusters, max_iter=5000, random_state=42)
         self.model.fit(self.X)
         return
 
@@ -253,8 +273,16 @@ class kmeans(_clustering):
 
 
 class dbscans(_clustering):
-    def __init__(self, data):
+    def __init__(self, data, use_cuda = False):
         super().__init__(data)
+        if(use_cuda):
+            if(has_rapids_env):
+                self.use_cuda = use_cuda
+            else:
+                self.use_cuda = False;
+                print("No rapids enviroments found.\nMoving to default DBScans instead.")
+        else:
+            self.use_cuda = False;
 
     def get_baseline_eps(self, n_neighbors=3):
 
@@ -322,8 +350,12 @@ class dbscans(_clustering):
         for eps in tqdm(eps_list):
 
             for min_sample in min_samples:
+                
+                if(self.use_cuda):
+                    dbscan = cu_DBSCAN(eps=eps, min_samples=min_sample).fit(self.X)
+                else:
+                    dbscan = DBSCAN(eps=eps, min_samples=min_sample).fit(self.X)
 
-                dbscan = DBSCAN(eps=eps, min_samples=min_sample).fit(self.X)
                 labels = dbscan.labels_
 
                 cluster_data = self.X.copy()
@@ -369,7 +401,11 @@ class dbscans(_clustering):
 
     def create_model(self, eps, msamples=5):
 
-        self.model = DBSCAN(eps=eps, min_samples=msamples, n_jobs=-1)
+        if(self.use_cuda):
+            self.model = cu_DBSCAN(eps=eps, min_samples=msamples)
+        else:
+            self.model = DBSCAN(eps=eps, min_samples=msamples)
+        
         self.model.fit(self.X)
 
         return

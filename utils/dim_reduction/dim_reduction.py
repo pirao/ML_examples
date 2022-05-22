@@ -1,7 +1,13 @@
 from sklearn.decomposition import PCA as SKLPCA
 from sklearn.preprocessing import StandardScaler
-from sklearn.manifold import TSNE
 
+has_rapids_env = True
+try:
+    from cuml.manifold import TSNE as cu_TSNE
+except ModuleNotFoundError:
+    has_rapids_env = False
+
+from sklearn.manifold import TSNE
 import plotly.express as px
 import numpy as np
 import pandas as pd
@@ -296,7 +302,7 @@ class ArbitraryCutStrategy:
 
 class T_SNE():
 
-    def __init__(self, n_components=2, perplexity=30, random_state=42, early_exaggeration=12):
+    def __init__(self, n_components=2, perplexity=30, random_state=42, early_exaggeration=12, use_cuda = False):
         '''
         Um objeto que plota o tsne de dados quaisquer.
         I/O:
@@ -307,8 +313,22 @@ class T_SNE():
         self.perplexity = perplexity
         self.random_state = random_state
 
-        self.tsne = TSNE(n_components=n_components, random_state=random_state, perplexity=perplexity,
-                         early_exaggeration=early_exaggeration)
+        if(use_cuda):
+            if(has_rapids_env):
+                self.tsne = cu_TSNE(n_components=n_components, random_state=random_state, perplexity=perplexity,
+                        early_exaggeration=early_exaggeration)
+            else:
+                print("No rapids enviroment found\nMoving to default TSNE instead")
+                self.tsne = TSNE(n_components=n_components, random_state=random_state, perplexity=perplexity,
+                        early_exaggeration=early_exaggeration)
+
+        else:
+            self.tsne = TSNE(n_components=n_components, random_state=random_state, perplexity=perplexity,
+                        early_exaggeration=early_exaggeration)
+        
+
+
+
 
     def fit(self, X):
         self.data = self.tsne.fit_transform(X)

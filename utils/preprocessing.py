@@ -1,14 +1,8 @@
-import numpy as np
 import matplotlib.pyplot as plt
-from tqdm import tqdm
 import os
 import pandas as pd
-from scipy.fft import fft, fftfreq, ifft, fft2,ifft2
-from scipy.signal import welch, butter, filtfilt
-
-
-from sklearn.metrics import mean_squared_error, f1_score, accuracy_score, mean_absolute_error, r2_score
-from sklearn.model_selection import cross_val_score, train_test_split, KFold, StratifiedShuffleSplit, TimeSeriesSplit, RepeatedKFold
+import seaborn as sns
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder, OneHotEncoder, RobustScaler
 
 
@@ -129,3 +123,56 @@ def create_scaled_dataset(X, y, test_size=0.2,shuffle=True):
     X_scaled_train = pd.DataFrame(std_scaler.fit_transform(X_train), columns=X_train.columns, index=X_train.index)
     X_scaled_test = pd.DataFrame(std_scaler.transform(X_test), columns=X_test.columns, index=X_test.index)
     return X_scaled_train, X_scaled_test, y_train, y_test
+
+
+def check_nan(dataframe, plot = True):
+    
+    """Checks whether a given dataset contains any missing value or not
+
+    Args:
+        dataframe (pandas): Input dataset
+        plot (boolean, optional): If the heatmap should be displayed. Defaults to True.
+        
+    Returns:
+        (boolean): if the dataframe contains missing values
+    """
+    if(plot):
+        ax = sns.heatmap(dataframe.isna())
+        plt.show()
+
+    nans = dataframe.isna()
+    columns = nans.columns
+
+    for i in range(len(columns)):
+        if True in list(nans[columns[i]]):
+            return True
+
+    return False
+
+
+def remove_nan(dataframe, axis = 0, plot = True):
+
+    """Removes all missing values from a given pandas dataframe.
+
+    Args:
+        dataframe (pandas): Input dataset
+        axis (0 or 'index', 1 or 'columns', optional): Determine if rows or columns 
+        which contain missing values are removed. Defaults to 0.
+             - 0, or 'index' : Drop rows which contain missing values.
+             - 1, or 'columns' : Drop columns which contain missing value.
+        plot (boolean, optional): If the heatmap should be displayed. Defaults to True.
+        
+    Returns:
+        (pandas): DataFrame with NA entries dropped from it.
+    """
+    new_df = dataframe.copy()
+
+    if(check_nan(dataframe)):
+        new_df  = new_df.dropna(axis = axis)
+
+    if(plot):
+        ax = sns.heatmap(new_df.isna())
+        plt.show()
+
+    
+    return new_df.reset_index(drop = True)
