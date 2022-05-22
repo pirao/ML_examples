@@ -1,8 +1,6 @@
-from os import altsep, remove
 import seaborn as sns
-import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib as mpl
+import numpy as np
 from sqlalchemy import false
 from tqdm import tqdm
 import pickle
@@ -11,6 +9,8 @@ has_rapids_env = True
 try:
     from cuml.cluster import KMeans as cu_KMeans
     from cuml.cluster import DBSCAN as cu_DBSCAN
+    from cuml.neighbors import NearestNeighbors as cu_NNeighbors
+    import cupy as cp
 except ModuleNotFoundError:
     has_rapids_env = False
 
@@ -21,6 +21,17 @@ from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bo
 from kneed import KneeLocator
 from yellowbrick.cluster import silhouette_visualizer
 from sklearn.neighbors import NearestNeighbors
+
+
+def NNeighbors(X, n_neighbors, use_cuda = False):
+    
+    if(use_cuda and has_rapids_env):
+        
+        nbrs = cu_NNeighbors(n_neighbors=n_neighbors).fit(X)
+    else:
+        nbrs = NearestNeighbors(n_neighbors=n_neighbors).fit(X)
+    return nbrs.kneighbors(X)
+    
 
 
 def make_categorical(array):
@@ -61,8 +72,12 @@ def max_index(array):
     Returns:
         integer: index of the largest item
     """
-    aux = np.array(array)
-    return np.where(aux == np.amax(aux))[0][0]
+    if(has_rapids_env):
+        aux = cp.array(array)
+        return cp.where(aux == cp.amax(aux))[0][0]
+    else:
+        aux = np.array(array)
+        return np.where(aux == np.amax(aux))[0][0]
 
 
 def min_index(array):
@@ -74,8 +89,12 @@ def min_index(array):
     Returns:
         integer: index of the smallest item
     """
-    aux = np.array(array)
-    return np.where(aux == np.amin(aux))[0][0]
+    if(has_rapids_env):
+        aux = cp.array(array)
+        return cp.where(aux == cp.amin(aux))[0][0]
+    else:
+        aux = np.array(array)
+        return np.where(aux == np.amin(aux))[0][0]
 
 
 def normalize_(array):
@@ -87,7 +106,8 @@ def normalize_(array):
     Returns:
         numpy array: normalized array
     """
-    aux = np.array(array)
+    
+    aux = cp.array(array) if (has_rapids_env) else np.array(array)
     return (aux - aux.min()) / (aux.max() - aux.min())
 
 
@@ -204,13 +224,12 @@ class kmeans(_clustering):
             km = kmeans(self.X)
             km.create_model(n_clusters=i)
             km.clustering(self.X)
-
+  
             # computing the scores
             ine.append(km.inertia())  # Find Elbow
             sil.append(km.silhouette_score_())  # Maximize
             calinski_harabasz.append(km.calinski_harabasz_score_())  # Maximize
             davies_bouldin.append(km.davies_bouldin_score_())  # Minimize
-
             if verbose:
                 print(f'Number of groups: {i} --- Inertia: {ine[i - 2]}')
                 print(f'Number of groups: {i} --- Silhouette coefficient: {sil[i - 2]}')
@@ -286,16 +305,15 @@ class dbscans(_clustering):
 
     def get_baseline_eps(self, n_neighbors=3):
 
-        nbrs = NearestNeighbors(n_neighbors=n_neighbors).fit(self.X)
-        dists, inds = nbrs.kneighbors(self.X)
+        dists,inds = NNeighbors(X = self.X, n_neighbors=n_neighbors, use_cuda=self.use_cuda)
 
         # Sort in ascending order
-        dists = np.sort(dists, axis=0)
+        dists = cp.sort(dists, axis=0) if(has_rapids_env) else np.sort(dists, axis=0)
 
         # Get the distance of the k'th farthest point
         dists = dists[:, -1]
 
-        n_range = np.arange(0, len(dists), 1)
+        n_range = np.arange(0, len(dists), 1) if(has_rapids_env) else cp.arange(0, len(dists), 1)
         kl = KneeLocator(n_range, dists, curve="convex", direction='increasing', S=3)
 
         knee = kl.knee
@@ -416,7 +434,8 @@ class GMM(_clustering):
 
     cv_types = ['spherical', 'tied', 'diag', 'full']
 
-    def make_ellipses(self, ax, color_pallete="bright"):
+    
+    """def make_ellipses(self, ax, color_pallete="bright"):
 
         colors = sns.color_palette(color_pallete)
         for n in range(len(self.model.means_)):
@@ -444,7 +463,7 @@ class GMM(_clustering):
                 ell.set_clip_box(ax.bbox)
                 ell.set_alpha(1)
                 ax.add_artist(ell)
-                ax.set_aspect("equal", "datalim")
+                ax.set_aspect("equal", "datalim")"""
 
     def __plot_scores(self, n_clusters, sil, calinski_harabasz, davies_bouldin, bic):
 
@@ -497,10 +516,12 @@ class GMM(_clustering):
         self.n_range = n_range
 
         # intialize the score arrays
-        sil = np.zeros(4 * (n_clusters - 1))
-        calinski_harabasz = np.zeros(4 * (n_clusters - 1))
-        davies_bouldin = np.zeros(4 * (n_clusters - 1))
-        bic = np.zeros(4 * (n_clusters - 1))
+        
+        sil = cp.zeros(4 * (n_clusters - 1)) if(has_rapids_env) else np.zeros(4 * (n_clusters - 1))
+        calinski_harabasz = cp.zeros(4 * (n_clusters - 1)) if(has_rapids_env) else np.zeros(4 * (n_clusters - 1))
+        davies_bouldin = cp.zeros(4 * (n_clusters - 1)) if(has_rapids_env) else np.zeros(4 * (n_clusters - 1))
+        bic = cp.zeros(4 * (n_clusters - 1)) if(has_rapids_env) else np.zeros(4 * (n_clusters - 1))
+
         it = 0
 
         # loops between each covariance type
@@ -515,7 +536,6 @@ class GMM(_clustering):
                 # saves the scores
                 sil[it] = silhouette_score(self.X, gmm.predict(self.X))  # Maximize
                 calinski_harabasz[it] = calinski_harabasz_score(self.X, gmm.predict(self.X))  # Maximize
-                davies_bouldin[it] = davies_bouldin_score(self.X, gmm.predict(self.X))  # Minimize
                 bic[it] = gmm.bic(self.X)  # Minimize
 
                 if verbose:
@@ -578,7 +598,7 @@ class GMM(_clustering):
             cluster_data['cluster'] = self.model.predict(X)
 
             # creates a array with scores of each prediction
-            k = np.array(self.model.score_samples(X))
+            k = cp.array(self.model.score_samples(X)) if(has_rapids_env) else np.array(self.model.score_samples(X))
             # normalize the array betweeen 0 and 1
             k = (k - k.min()) / (k.max() - k.min())
 

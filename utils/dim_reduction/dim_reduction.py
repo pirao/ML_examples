@@ -1,4 +1,6 @@
+from sklearn import neighbors
 from sklearn.decomposition import PCA as SKLPCA
+from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
 
 has_rapids_env = True
